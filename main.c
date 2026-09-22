@@ -69,8 +69,35 @@ void send_udp_command(const char *msg) {
         buffer[n] = '\0';
         // Limpar o \n do final para não estragar a formatação do printf
         if (buffer[n-1] == '\n') buffer[n-1] = '\0';
-        printf("Resposta do Servidor: %s\n", buffer);
-        
+
+        //Resposta em login
+        if (strncmp(buffer, "RLI", 3) == 0) {
+            if (strncmp(buffer + 4, "OK", 2) == 0) {
+                printf("Login bem-sucedido.\n");
+            } else if (strncmp(buffer + 4, "REG", 3) == 0) {
+                printf("Registado com sucesso.\n");
+            } else if (strncmp(buffer + 4, "NOK", 3) == 0) {
+                printf("Password incorreta.\n");
+            }
+
+        } else if (strncmp(buffer, "RLO", 3) == 0) {
+            if (strncmp(buffer + 4, "OK", 2) == 0) {
+                printf("Logout bem-sucedido.\n");
+            } else if (strncmp(buffer + 4, "NLG", 3) == 0) {
+                printf("Não tens sessão iniciada.\n") ;
+            } else if (strncmp(buffer + 4, "WRP", 3) == 0) {
+                printf("Password incorreta.\n");
+            }
+
+        } else if (strncmp(buffer, "RUR", 3) == 0) {
+            if (strncmp(buffer + 4, "OK", 2) == 0) {
+                printf("Registo cancelado com sucesso.\n");
+            } else if (strncmp(buffer + 4, "NOK", 3) == 0) {
+                printf("Nao tens sessao iniciada.\n");
+            } else if (strncmp(buffer + 4, "WRP", 3) == 0) {
+                printf("Password incorreta.\n");
+            }
+        }
         // Atualizar estado local com base na resposta
         if (strncmp(buffer, "RLI OK", 6) == 0 || strncmp(buffer, "RLI REG", 7) == 0) {
             is_logged_in = true;
@@ -130,11 +157,11 @@ int main(int argc, char *argv[]) {
 
         if (strcmp(cmd, "login") == 0) {
             if (is_logged_in) {
-                printf("Erro local: Já tens sessão iniciada. Faz logout primeiro.\n");
+                printf("Erro: Já tens sessão iniciada. Faz logout primeiro.\n");
                 continue;
             }
             if (parsed != 3 || !is_valid_uid(arg1) || !is_valid_password(arg2)) {
-                printf("Erro local: Formato inválido. Uso: login <6-digits> <8-alnum>\n");
+                printf("Erro: Formato inválido. Uso: login <6-digits> <8-alnum>\n");
                 continue;
             }
             char msg[BUFFER_SIZE];
@@ -148,7 +175,7 @@ int main(int argc, char *argv[]) {
 
         } else if (strcmp(cmd, "logout") == 0) {
             if (!is_logged_in) {
-                printf("Erro local: Não tens sessão iniciada.\n");
+                printf("Erro: Não tens sessão iniciada.\n");
                 continue;
             }
             char msg[BUFFER_SIZE];
@@ -157,7 +184,7 @@ int main(int argc, char *argv[]) {
 
         } else if (strcmp(cmd, "unregister") == 0) {
             if (!is_logged_in) {
-                printf("Erro local: Não tens sessão iniciada para desregistar.\n");
+                printf("Erro: Não tens sessão iniciada para desregistar.\n");
                 continue;
             }
             char msg[BUFFER_SIZE];
@@ -166,13 +193,13 @@ int main(int argc, char *argv[]) {
 
         } else if (strcmp(cmd, "exit") == 0) {
             if (is_logged_in) {
-                printf("Erro local: Ainda tens sessão iniciada. Executa 'logout' primeiro.\n");
+                printf("Erro: Ainda tens sessão iniciada. Dá logout primeiro.\n");
             } else {
                 printf("A sair...\n");
                 exit(EXIT_SUCCESS);
             }
         } else {
-            printf("Comando desconhecido ou não suportado na Fase I.\n");
+            printf("Comando desconhecido.\n");
         }
     }
     return 0;
