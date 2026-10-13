@@ -41,7 +41,6 @@ static bool is_valid_password(const char *password) {
 }
 
 // Verifica o nome local antes de publicar ou pedir um recurso.
-// O protocolo aceita nomes alfanumericos com '+', '-', '_' e '.'.
 static bool is_valid_filename(const char *filename) {
     size_t length = strlen(filename);
 
@@ -61,11 +60,11 @@ static bool is_valid_filename(const char *filename) {
 }
 
 // Converte a resposta LST numa lista legivel para o utilizador.
-static void print_resource_list(const char *response) {
+static void print_file_list(const char *response) {
     char list[BUFFER_SIZE];
-    snprintf(list, sizeof(list), "%s", response + 7);
+    snprintf(list, sizeof(list), "%s", response + 7); // Ignora "RLS OK "
 
-    printf("Recursos disponiveis:\n");
+    printf("Ficheiros disponiveis:\n");
     char *filename = strtok(list, " ");
     while (filename != NULL) {
         printf("- %s\n", filename);
@@ -73,8 +72,7 @@ static void print_resource_list(const char *response) {
     }
 }
 
-static bool configure_address(struct sockaddr_in *address,
-                              const ClientState *state) {
+static bool configure_address(struct sockaddr_in *address, const ClientState *state) {
     // A configuracao do endereco ficou separada para ser usada por UDP e TCP.
     memset(address, 0, sizeof(*address));
     address->sin_family = AF_INET;
@@ -88,13 +86,22 @@ static bool configure_address(struct sockaddr_in *address,
     return true;
 }
 
+static void format_version_date(const char *date, char *formatted_date,
+                                size_t formatted_size) {
+    snprintf(formatted_date, formatted_size, "%c%c/%c%c/%c%c%c%c %c%c:%c%c:%c%c",
+             date[6], date[7], date[4], date[5], date[0], date[1], date[2],
+             date[3], date[9], date[10], date[11], date[12], date[13],
+             date[14]);
+}
+
 static void print_versions(const char *response) {
     char copy[BUFFER_SIZE];
     snprintf(copy, sizeof(copy), "%s", response);
 
     char *save_pointer = NULL;
-    char *token = strtok_r(copy, " ", &save_pointer);
-    char *status = token != NULL ? strtok_r(NULL, " ", &save_pointer) : NULL;
+    char *token = strtok_r(copy, " \n", &save_pointer);
+    char *status =
+        token != NULL ? strtok_r(NULL, " \n", &save_pointer) : NULL;
 
     if (status == NULL || strcmp(status, "OK") != 0) {
         printf("Nao existem versoes disponiveis para este recurso.\n");
@@ -102,29 +109,30 @@ static void print_versions(const char *response) {
     }
 
     printf("Versoes disponiveis:\n");
-    // Cada versao recebida contem UID, tamanho, label, data e disponibilidade.
-    while ((token = strtok_r(NULL, " ", &save_pointer)) != NULL) {
-        printf("%s", token);
-        token = strtok_r(NULL, " ", &save_pointer);
-        if (token == NULL) {
-            break;
+    // Cada versao contem UID, tamanho, label, data e disponibilidade.
+    int version_number = 1;
+    while ((token = strtok_r(NULL, " \n", &save_pointer)) != NULL) {
+        char *uid = token;
+        char *size = strtok_r(NULL, " \n", &save_pointer);
+        char *label = strtok_r(NULL, " \n", &save_pointer);
+        char *date = strtok_r(NULL, " \n", &save_pointer);
+        char *availability = strtok_r(NULL, " \n", &save_pointer);
+
+        char formatted_date[20];
+        format_version_date(date, formatted_date, sizeof(formatted_date));
+
+        if (strcmp(availability, "AVL") == 0) {
+            availability = "Disponivel";
+        } else if (strcmp(availability, "NAV") == 0) {
+            availability = "Indisponivel";
         }
-        printf(" %s", token);
-        token = strtok_r(NULL, " ", &save_pointer);
-        if (token == NULL) {
-            break;
-        }
-        printf(" %s", token);
-        token = strtok_r(NULL, " ", &save_pointer);
-        if (token == NULL) {
-            break;
-        }
-        printf(" %s", token);
-        token = strtok_r(NULL, " ", &save_pointer);
-        if (token == NULL) {
-            break;
-        }
-        printf(" %s\n", token);
+
+        printf("\nVersao %d\n", version_number++);
+        printf("  UID: %s\n", uid);
+        printf("  Tamanho: %s bytes\n", size);
+        printf("  Label: %s\n", label);
+        printf("  Data: %s\n", formatted_date);
+        printf("  Disponibilidade: %s\n", availability);
     }
 }
 
@@ -198,30 +206,30 @@ static void send_udp_command(const char *message, ClientState *state) {
         }
     } else if (strncmp(response, "RPB", 3) == 0) {
         if (strncmp(response + 4, "OK", 2) == 0) {
-            printf("Recurso publicado com sucesso.\n");
+            printf("Ficheiro publicado com sucesso.\n");
         } else if (strncmp(response + 4, "NLG", 3) == 0) {
             printf("Erro: Nao tens sessao iniciada.\n");
         } else if (strncmp(response + 4, "WRP", 3) == 0) {
             printf("Erro: Password incorreta.\n");
         } else {
-            printf("Erro: Nao foi possivel publicar o recurso.\n");
+            printf("Erro: Nao foi possivel publicar o ficheiro.\n");
         }
     } else if (strncmp(response, "RRM", 3) == 0) {
         if (strncmp(response + 4, "OK", 2) == 0) {
-            printf("Recurso removido com sucesso.\n");
+            printf("Ficheiro removido com sucesso.\n");
         } else if (strncmp(response + 4, "NLG", 3) == 0) {
             printf("Erro: Nao tens sessao iniciada.\n");
         } else if (strncmp(response + 4, "WRP", 3) == 0) {
             printf("Erro: Password incorreta.\n");
         } else if (strncmp(response + 4, "NOK", 3) == 0) {
-            printf("Erro: O recurso nao esta publicado por este utilizador.\n");
+            printf("Erro: O ficheiro não está publicado por este utilizador.\n");
         } else {
-            printf("Erro: Nao foi possivel remover o recurso.\n");
+            printf("Erro: Nao foi possivel remover o ficheiro.\n");
         }
     } else if (strncmp(response, "RLS OK", 6) == 0) {
-        print_resource_list(response);
+        print_file_list(response);
     } else if (strncmp(response, "RLS NOK", 7) == 0) {
-        printf("Nao existem recursos publicados.\n");
+        printf("Nao existem ficheiros publicados.\n");
     } else {
         printf("Resposta desconhecida do DS: %s\n", response);
     }
@@ -239,24 +247,20 @@ static void send_udp_command(const char *message, ClientState *state) {
     close(socket_fd);
 }
 
-static bool receive_tcp_line(int socket_fd, char *buffer, size_t buffer_size) {
-    // Le uma resposta TCP ate ao '\n', porque TCP nao preserva fronteiras
-    // entre mensagens como acontece com UDP.
+static bool receive_tcp_response(int socket_fd, char *buffer,
+                                 size_t buffer_size) {
     size_t length = 0;
 
     while (length + 1 < buffer_size) {
-        char character;
-        ssize_t received = recv(socket_fd, &character, 1, 0);
+        ssize_t received =
+            recv(socket_fd, buffer + length, buffer_size - length - 1, 0);
         if (received == 0) {
             break;
         }
         if (received < 0) {
             return false;
         }
-        if (character == '\n') {
-            break;
-        }
-        buffer[length++] = character;
+        length += (size_t)received;
     }
 
     buffer[length] = '\0';
@@ -298,7 +302,7 @@ static void handle_versions(const char *filename, ClientState *state) {
     }
 
     char response[BUFFER_SIZE];
-    if (!receive_tcp_line(socket_fd, response, sizeof(response))) {
+    if (!receive_tcp_response(socket_fd, response, sizeof(response))) {
         printf("Erro: Sem resposta do servidor DS (Timeout).\n");
     } else if (strncmp(response, "RVR", 3) == 0) {
         print_versions(response);
