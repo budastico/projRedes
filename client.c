@@ -65,7 +65,7 @@ static void print_file_list(const char *response) {
     snprintf(list, sizeof(list), "%s", response + 7); // Ignora "RLS OK "
 
     printf("Ficheiros disponiveis:\n");
-    char *filename = strtok(list, " ");
+    char *filename = strtok(list, " ");  // dividir string em partes
     while (filename != NULL) {
         printf("- %s\n", filename);
         filename = strtok(NULL, " ");
@@ -143,9 +143,10 @@ static void send_udp_command(const char *message, ClientState *state) {
         perror("Erro a criar socket UDP");
         return;
     }
-    // Antes havia apenas uma espera; agora sao feitas tres tentativas de 0.5s.
+    // Timeout de tres tentativas de 0.5s.
     struct timeval timeout = {.tv_sec = 0, .tv_usec = UDP_TIMEOUT_USEC};
     setsockopt(socket_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    
     struct sockaddr_in ds_address;
     if (!configure_address(&ds_address, state)) {
         close(socket_fd);
@@ -410,13 +411,15 @@ static void handle_list(ClientState *state) {
     send_udp_command("LST\n", state);
 }
 
+// Inicialização
 void client_state_init(ClientState *state) {
     // Inicializa o estado e aplica os valores por defeito do enunciado.
-    memset(state, 0, sizeof(*state));
+    memset(state, 0, sizeof(*state)); // preencher com 0s todos os bytes da estrutura
     snprintf(state->ds_ip, sizeof(state->ds_ip), "%s", DEFAULT_DS_IP);
     snprintf(state->ds_port, sizeof(state->ds_port), "%s", DEFAULT_DS_PORT);
 }
 
+// Argumentos do terminal
 bool parse_arguments(int argc, char *argv[], ClientState *state) {
     // O peer port e obrigatorio; IP e porta do DS podem usar os defaults.
     int option;
