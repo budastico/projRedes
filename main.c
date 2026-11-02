@@ -19,12 +19,12 @@ int main(int argc, char *argv[]) {
 
     while (true) {
         printf("> ");
-        if (fgets(input, sizeof(input), stdin) == NULL) {
+        if (fgets(input, sizeof(input), stdin) == NULL) {    // lê 1 linha do teclado e guarda-a em input
             break;
         }
 
-        input[strcspn(input, "\n")] = '\0';
-        process_command(input, &state);
+        input[strcspn(input, "\n")] = '\0';  // substitui \n por '\0'
+        process_command(input, &state);   // analisa comando escrito pelo utilizador e escolhe a operação correspondente
     }
 
     return EXIT_SUCCESS;
